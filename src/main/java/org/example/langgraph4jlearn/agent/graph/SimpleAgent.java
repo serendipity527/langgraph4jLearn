@@ -64,6 +64,15 @@ public class SimpleAgent {
     }
     
     /**
+     * 获取状态图（用于 Studio 可视化）
+     * 
+     * @return StateGraph 实例
+     */
+    public StateGraph<SimpleAgentState> getGraph() {
+        return this.graph;
+    }
+    
+    /**
      * 执行Agent
      * 
      * @param initialMessage 初始消息
