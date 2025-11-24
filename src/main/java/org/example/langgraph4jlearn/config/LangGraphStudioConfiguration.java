@@ -6,6 +6,7 @@ import org.bsc.langgraph4j.studio.LangGraphStudioServer;
 import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.studio.springboot.LangGraphStudioConfig;
 import org.example.langgraph4jlearn.agent.graph.SimpleAgent;
+import org.example.langgraph4jlearn.agent.graph.MedicalAgent;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Map;
@@ -21,26 +22,36 @@ public class LangGraphStudioConfiguration extends LangGraphStudioConfig {
         try {
             // 创建 SimpleAgent
             SimpleAgent simpleAgent = new SimpleAgent();
-            
-            // 创建 MemorySaver 作为 CheckpointSaver
-            MemorySaver saver = new MemorySaver();
-            
-            // 构建 Studio Instance
+            MemorySaver saver1 = new MemorySaver();
             LangGraphStudioServer.Instance simpleAgentInstance = 
                 LangGraphStudioServer.Instance.builder()
                     .title("Simple Agent - 简单对话Agent")
-                    .addInputStringArg("message")  // 添加输入参数
-                    .graph(simpleAgent.getGraph())  // 注册图
+                    .addInputStringArg("message")
+                    .graph(simpleAgent.getGraph())
                     .compileConfig(CompileConfig.builder()
-                        .checkpointSaver(saver)  // 必须配置 CheckpointSaver
+                        .checkpointSaver(saver1)
                         .build())
                     .build();
-            
             log.info("SimpleAgent 已注册到 LangGraph Studio");
             
-            // 返回实例映射，key 是实例 ID
+            // 创建 MedicalAgent
+            MedicalAgent medicalAgent = new MedicalAgent();
+            MemorySaver saver2 = new MemorySaver();
+            LangGraphStudioServer.Instance medicalAgentInstance = 
+                LangGraphStudioServer.Instance.builder()
+                    .title("Medical Agent - 医疗健康多智能体")
+                    .addInputStringArg("userQuery")
+                    .graph(medicalAgent.getGraph())
+                    .compileConfig(CompileConfig.builder()
+                        .checkpointSaver(saver2)
+                        .build())
+                    .build();
+            log.info("MedicalAgent 已注册到 LangGraph Studio");
+            
+            // 返回实例映射
             return Map.of(
-                "simple-agent", simpleAgentInstance
+                "simple-agent", simpleAgentInstance,
+                "medical-agent", medicalAgentInstance
             );
             
         } catch (Exception e) {
