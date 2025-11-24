@@ -7,6 +7,8 @@ import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.studio.springboot.LangGraphStudioConfig;
 import org.example.langgraph4jlearn.agent.graph.SimpleAgent;
 import org.example.langgraph4jlearn.agent.graph.MedicalAgent;
+import org.example.langgraph4jlearn.agent.graph.MedicalAssistantGraph;
+import org.example.langgraph4jlearn.demo.HumanInLoopDemo;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Map;
@@ -48,10 +50,58 @@ public class LangGraphStudioConfiguration extends LangGraphStudioConfig {
                     .build();
             log.info("MedicalAgent 已注册到 LangGraph Studio");
             
+            // 创建 MedicalAssistantGraph (阶段2)
+            MedicalAssistantGraph medicalAssistantGraph = new MedicalAssistantGraph();
+            MemorySaver saver3 = new MemorySaver();
+            LangGraphStudioServer.Instance medicalAssistantInstance = 
+                LangGraphStudioServer.Instance.builder()
+
+                    .title("Medical Assistant Stage2 - 意图识别与紧急分诊")
+                    .addInputStringArg("userQuery")
+                    .graph(medicalAssistantGraph.getGraph())
+
+                    .compileConfig(CompileConfig.builder()
+                        .checkpointSaver(saver3)
+                        .build())
+                    .build();
+            log.info("MedicalAssistantGraph (阶段2) 已注册到 LangGraph Studio");
+            
+            // 创建 HumanInLoop 工作流
+            MemorySaver saver4 = new MemorySaver();
+            LangGraphStudioServer.Instance humanInLoopInstance = 
+                LangGraphStudioServer.Instance.builder()
+                    .title("Human In Loop - 人在回路演示")
+                    .addInputStringArg("messages")
+                    .graph(HumanInLoopDemo.buildWorkflow())
+                    .compileConfig(CompileConfig.builder()
+                        .checkpointSaver(saver4)
+                        .interruptBefore("human_feedback")  // 在human_feedback节点前中断
+                        .build())
+                    .build();
+            log.info("HumanInLoop 工作流已注册到 LangGraph Studio");
+            
+            // 创建 Medical Assistant with Human-in-Loop (免责声明确认)
+            MedicalAssistantGraph medicalAssistant = new MedicalAssistantGraph();
+            MemorySaver saver5 = new MemorySaver();
+            LangGraphStudioServer.Instance medicalAssistantHITLInstance = 
+                LangGraphStudioServer.Instance.builder()
+                    .title("Medical Assistant HITL - 免责声明人在回路")
+                    .addInputStringArg("userQuery")
+                    .graph(medicalAssistant.getGraph())
+                    .compileConfig(CompileConfig.builder()
+                        .checkpointSaver(saver5)
+                        .interruptBefore("user_consent")  // 在用户同意前中断
+                        .build())
+                    .build();
+            log.info("Medical Assistant HITL 已注册到 LangGraph Studio");
+            
             // 返回实例映射
             return Map.of(
                 "simple-agent", simpleAgentInstance,
-                "medical-agent", medicalAgentInstance
+                "medical-agent", medicalAgentInstance,
+                "medical-assistant-stage2", medicalAssistantInstance,
+                "human-in-loop", humanInLoopInstance,
+                "medical-assistant-hitl", medicalAssistantHITLInstance
             );
             
         } catch (Exception e) {

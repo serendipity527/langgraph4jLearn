@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医疗AI助手 - 人在回路演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }
+
+        .disclaimer-box {
+            background: #fff9e6;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .disclaimer-title {
+            color: #f57c00;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .disclaimer-title::before {
+            content: "⚠️";
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        .disclaimer-content {
+            color: #333;
+            line-height: 1.8;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(17, 153, 142, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(238, 9, 121, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .status-box {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .status-box.success {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+
+        .status-box.error {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+
+        .status-box.info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            color: #1565c0;
+        }
+
+        .status-box.warning {
+            background: #fff3e0;
+            border: 1px solid #ff9800;
+            color: #e65100;
+        }
+
+        .messages-box {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .message-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .info-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 5px;
+        }
+
+        .stage-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            padding: 0 10px;
+        }
+
+        .stage-item {
+            text-align: center;
+            flex: 1;
+            position: relative;
+        }
+
+        .stage-item::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            width: 100%;
+            height: 2px;
+            background: #e0e0e0;
+            z-index: -1;
+        }
+
+        .stage-item:last-child::after {
+            display: none;
+        }
+
+        .stage-dot {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 8px;
+        }
+
+        .stage-item.active .stage-dot {
+            background: #667eea;
+        }
+
+        .stage-item.completed .stage-dot {
+            background: #4caf50;
+        }
+
+        .stage-label {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>🏥 医疗AI助手</h1>
+            <p>人在回路演示 - 免责声明确认流程</p>
+        </div>
+
+        <!-- 阶段1: 输入查询 -->
+        <div id="stage1" class="card">
+            <h2 style="color: #333; margin-bottom: 20px;">步骤 1: 开始咨询</h2>
+            <div class="input-group">
+                <label for="userQuery">请输入您的健康咨询问题：</label>
+                <textarea id="userQuery" placeholder="例如：我最近总是感觉头晕，这是怎么回事？"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="startConsultation()">
+                <span>开始咨询</span>
+            </button>
+        </div>
+
+        <!-- 阶段2: 免责声明确认 -->
+        <div id="stage2" class="card hidden">
+            <h2 style="color: #333; margin-bottom: 20px;">步骤 2: 免责声明确认</h2>
+            
+            <div class="stage-indicator">
+                <div class="stage-item completed">
+                    <div class="stage-dot">✓</div>
+                    <div class="stage-label">开始</div>
+                </div>
+                <div class="stage-item active">
+                    <div class="stage-dot">2</div>
+                    <div class="stage-label">免责声明</div>
+                </div>
+                <div class="stage-item">
+                    <div class="stage-dot">3</div>
+                    <div class="stage-label">意图分诊</div>
+                </div>
+                <div class="stage-item">
+                    <div class="stage-dot">4</div>
+                    <div class="stage-label">完成</div>
+                </div>
+            </div>
+
+            <div class="disclaimer-box">
+                <div class="disclaimer-title">医疗AI助手免责声明</div>
+                <div class="disclaimer-content" id="disclaimerContent"></div>
+            </div>
+
+            <div class="status-box warning">
+                <strong>⏸️ 工作流已暂停</strong><br>
+                等待您的确认。请仔细阅读上述免责声明，然后选择：
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-success" onclick="submitConsent(true)">
+                    <span>✓ 我已阅读并同意</span>
+                </button>
+                <button class="btn btn-danger" onclick="submitConsent(false)">
+                    <span>✗ 我不同意</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 阶段3: 结果展示 -->
+        <div id="stage3" class="card hidden">
+            <h2 style="color: #333; margin-bottom: 20px;">步骤 3: 执行结果</h2>
+            
+            <div id="resultStatus" class="status-box"></div>
+            
+            <div class="messages-box">
+                <h3 style="margin-bottom: 15px; color: #333;">执行流程：</h3>
+                <div id="messagesContainer"></div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <div><strong>会话ID:</strong> <span class="info-badge" id="displaySessionId"></span></div>
+                <div><strong>当前阶段:</strong> <span class="info-badge" id="displayStage"></span></div>
+                <div><strong>当前节点:</strong> <span class="info-badge" id="displayNode"></span></div>
+                <div><strong>下一个节点:</strong> <span class="info-badge" id="displayNextNode"></span></div>
+            </div>
+
+            <button class="btn btn-primary" onclick="resetForm()" style="margin-top: 20px;">
+                <span>开始新的咨询</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        const API_BASE = '/api/medical-assistant';
+
+        async function startConsultation() {
+            const userQuery = document.getElementById('userQuery').value.trim();
+            
+            if (!userQuery) {
+                alert('请输入您的问题');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userQuery })
+                });
+
+                const data = await response.json();
+                console.log('Start response:', data);
+
+                if (data.success) {
+                    sessionId = data.sessionId;
+                    
+                    // 显示免责声明
+                    const messages = data.messages || [];
+                    const disclaimerMsg = messages.find(m => m.includes('免责声明'));
+                    if (disclaimerMsg) {
+                        document.getElementById('disclaimerContent').textContent = 
+                            disclaimerMsg.replace('系统: ', '');
+                    }
+
+                    // 切换到阶段2
+                    document.getElementById('stage1').classList.add('hidden');
+                    document.getElementById('stage2').classList.remove('hidden');
+                } else {
+                    alert('启动失败: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('请求失败: ' + error.message);
+            }
+        }
+
+        async function submitConsent(consented) {
+            if (!sessionId) {
+                alert('无效的会话');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/consent`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId, consented })
+                });
+
+                const data = await response.json();
+                console.log('Consent response:', data);
+
+                if (data.success) {
+                    // 显示结果
+                    displayResult(data, consented);
+                    
+                    // 切换到阶段3
+                    document.getElementById('stage2').classList.add('hidden');
+                    document.getElementById('stage3').classList.remove('hidden');
+                } else {
+                    alert('提交失败: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('请求失败: ' + error.message);
+            }
+        }
+
+        function displayResult(data, consented) {
+            // 状态框
+            const statusBox = document.getElementById('resultStatus');
+            if (consented) {
+                statusBox.className = 'status-box success';
+                statusBox.innerHTML = `
+                    <strong>✓ 用户已同意免责条款</strong><br>
+                    ${data.message || '工作流继续执行'}
+                `;
+            } else {
+                statusBox.className = 'status-box error';
+                statusBox.innerHTML = `
+                    <strong>✗ 用户拒绝免责条款</strong><br>
+                    ${data.message || '工作流已终止'}
+                `;
+            }
+
+            // 消息列表
+            const messagesContainer = document.getElementById('messagesContainer');
+            messagesContainer.innerHTML = '';
+            
+            if (data.messages && data.messages.length > 0) {
+                data.messages.forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = 'message-item';
+                    div.textContent = msg;
+                    messagesContainer.appendChild(div);
+                });
+            }
+
+            // 信息展示
+            document.getElementById('displaySessionId').textContent = sessionId;
+            document.getElementById('displayStage').textContent = data.stage || 'N/A';
+            document.getElementById('displayNode').textContent = data.currentNode || 'N/A';
+            document.getElementById('displayNextNode').textContent = data.nextNode || 'END';
+        }
+
+        function resetForm() {
+            sessionId = null;
+            document.getElementById('userQuery').value = '';
+            document.getElementById('stage1').classList.remove('hidden');
+            document.getElementById('stage2').classList.add('hidden');
+            document.getElementById('stage3').classList.add('hidden');
+        }
+
+        // 页面加载时检查API健康状态
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                console.log('API Health:', data);
+            } catch (error) {
+                console.error('API Health Check Failed:', error);
+            }
+        });
+    </script>
+</body>
+</html>
