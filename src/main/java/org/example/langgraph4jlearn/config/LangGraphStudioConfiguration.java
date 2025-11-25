@@ -96,20 +96,20 @@ public class LangGraphStudioConfiguration extends LangGraphStudioConfig {
                     .build();
             log.info("Medical Assistant HITL 已注册到 LangGraph Studio");
             
-            // 创建 Comprehensive Workflow - 综合示例
+            // 创建 Comprehensive Workflow - 综合示例(含子图)
             ComprehensiveWorkflowGraph comprehensiveWorkflow = new ComprehensiveWorkflowGraph();
             MemorySaver saver6 = new MemorySaver();
-            LangGraphStudioServer.Instance comprehensiveInstance = 
+            LangGraphStudioServer.Instance comprehensiveInstance =
                 LangGraphStudioServer.Instance.builder()
-                    .title("Comprehensive Workflow - 综合示例")
+                    .title("Comprehensive Workflow - 综合示例(含子图)")
                     .addInputStringArg("user_input")
                     .graph(comprehensiveWorkflow.getGraph())
                     .compileConfig(CompileConfig.builder()
                         .checkpointSaver(saver6)
-                        .interruptAfter("approval_request")  // 在审批请求后中断
+                        .interruptAfter("approval_request")
                         .build())
                     .build();
-            log.info("Comprehensive Workflow 已注册到 LangGraph Studio");
+            log.info("Comprehensive Workflow (含子图) 已注册到 LangGraph Studio");
             
             // 返回实例映射
             return Map.of(

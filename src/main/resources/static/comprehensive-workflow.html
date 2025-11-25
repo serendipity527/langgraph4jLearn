@@ -3,121 +3,273 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LangGraph4j 综合示例</title>
+    <title>LangGraph4j 综合示例 (含子图+多智能体)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .node-active { animation: pulse 1s infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .node-active { animation: pulse 1s infinite; box-shadow: 0 0 15px currentColor; }
+        .node-completed { background: rgba(34,197,94,0.3) !important; border-color: #22c55e !important; }
+        .node-waiting { animation: blink 0.8s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(1.05)} }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .subgraph-box { border: 2px dashed #8b5cf6; }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen p-6">
+<body class="bg-gray-900 text-white min-h-screen p-4">
     <div class="max-w-7xl mx-auto">
-        <header class="text-center mb-6">
-            <h1 class="text-2xl font-bold text-blue-400">LangGraph4j 综合示例演示</h1>
-            <p class="text-gray-400 text-sm">StateGraph | Node | Edge | Conditional Edge | Human-in-the-Loop | Checkpointer</p>
+        <header class="text-center mb-4">
+            <h1 class="text-xl font-bold text-blue-400">LangGraph4j 综合示例</h1>
+<p class="text-gray-400 text-xs">StateGraph | SubGraph | Multi-Agent | Node | Edge | Conditional Edge | HITL | Cycle</p>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <!-- 左侧控制 -->
-            <div class="space-y-4">
-                <div class="bg-gray-800 rounded-lg p-4">
-                    <h2 class="font-semibold mb-3 text-blue-400">输入控制</h2>
-                    <input type="text" id="userInput" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mb-3" placeholder="输入指令...">
-                    <div class="text-xs text-gray-500 mb-3 space-y-1">
+            <div class="space-y-3">
+                <div class="bg-gray-800 rounded-lg p-3">
+                    <h2 class="font-semibold mb-2 text-blue-400 text-sm">控制面板</h2>
+                    <div class="mb-2">
+                        <label class="text-xs text-gray-400">Thread ID</label>
+                        <input type="text" id="threadIdInput" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm font-mono" value="demo-thread">
+                    </div>
+                    <div class="mb-2">
+                        <label class="text-xs text-gray-400">用户输入</label>
+                        <input type="text" id="userInput" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm" placeholder="输入指令...">
+                    </div>
+                    <div class="text-xs text-gray-500 mb-2 space-y-1">
+                        <p class="text-gray-400 font-bold">单工作流示例:</p>
                         <p class="cursor-pointer hover:text-blue-400" onclick="setInput('查询天气')">• 查询天气 (安全)</p>
-                        <p class="cursor-pointer hover:text-blue-400" onclick="setInput('使用工具计算')">• 使用工具计算 (工具调用)</p>
-                        <p class="cursor-pointer hover:text-blue-400" onclick="setInput('删除数据')">• 删除数据 (危险,需审批)</p>
+                        <p class="cursor-pointer hover:text-blue-400" onclick="setInput('使用工具计算')">• 使用工具计算 (工具/Cycle)</p>
+                        <p class="cursor-pointer hover:text-green-400" onclick="setInput('健康咨询头痛')">• 健康咨询头痛 (子图)</p>
+                        <p class="cursor-pointer hover:text-red-400" onclick="setInput('删除数据')">• 删除数据 (危险/HITL)</p>
                     </div>
                     <div class="flex gap-2 mb-2">
-                        <button onclick="executeInvoke()" class="flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded text-sm">同步执行</button>
-                        <button onclick="executeStream()" class="flex-1 bg-purple-600 hover:bg-purple-700 py-2 rounded text-sm">流式执行</button>
+                        <button onclick="executeInvoke()" class="flex-1 bg-blue-600 hover:bg-blue-700 py-1 rounded text-xs">同步执行</button>
+                        <button onclick="executeStream()" class="flex-1 bg-purple-600 hover:bg-purple-700 py-1 rounded text-xs">流式执行</button>
                     </div>
-                    <button onclick="startHITL()" class="w-full bg-orange-600 hover:bg-orange-700 py-2 rounded text-sm">人在回路执行</button>
-                </div>
-
-                <div id="approvalPanel" class="bg-gray-800 rounded-lg p-4 hidden">
-                    <h2 class="font-semibold mb-3 text-yellow-400">⚠️ 人工审批</h2>
-                    <p id="approvalMsg" class="text-sm text-gray-300 mb-3"></p>
                     <div class="flex gap-2">
-                        <button onclick="approve()" class="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded">批准</button>
-                        <button onclick="reject()" class="flex-1 bg-red-600 hover:bg-red-700 py-2 rounded">拒绝</button>
+                        <button onclick="startWithThread()" class="flex-1 bg-cyan-600 hover:bg-cyan-700 py-1 rounded text-xs" title="带记忆但不中断">💾 ThreadId执行</button>
+                        <button onclick="startWithHitl()" class="flex-1 bg-orange-600 hover:bg-orange-700 py-1 rounded text-xs" title="危险操作会中断等待审批">🔒 人在回路(HITL)</button>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">Session: <span id="sessionDisplay"></span></p>
                 </div>
 
-                <div class="bg-gray-800 rounded-lg p-4">
-                    <h2 class="font-semibold mb-2 text-green-400">知识点</h2>
-                    <div class="text-xs space-y-1 text-gray-400">
-                        <p>🧱 StateGraph, Node, Edge, CompiledGraph</p>
-                        <p>🔄 Conditional Edge, Cycle, START/END</p>
-                        <p>💾 Channels, Reducer (Appender)</p>
-                        <p>🧠 Checkpointer, MemorySaver, ThreadID</p>
-                        <p>🛑 interruptAfter, updateState, resume</p>
+                <div class="bg-gray-800 rounded-lg p-3 border border-purple-500/30">
+                    <h2 class="font-semibold mb-2 text-purple-400 text-sm">记忆查看</h2>
+                    <div class="flex gap-2 mb-2">
+                        <button onclick="loadMemory()" class="flex-1 bg-purple-600 hover:bg-purple-700 py-1 rounded text-xs">查看记忆</button>
+                        <button onclick="continueThread()" class="flex-1 bg-green-600 hover:bg-green-700 py-1 rounded text-xs">继续执行</button>
+                    </div>
+                    <div id="memoryPanel" class="bg-gray-900 rounded p-2 text-xs max-h-32 overflow-y-auto">
+                        <p class="text-gray-500">输入ThreadId后点击"查看记忆"</p>
+                    </div>
+                </div>
+
+                <div id="approvalPanel" class="bg-gray-800 rounded-lg p-3 hidden">
+                    <h2 class="font-semibold mb-2 text-yellow-400 text-sm">人工审批</h2>
+                    <p id="approvalMsg" class="text-xs text-gray-300 mb-2"></p>
+                    <div class="flex gap-2">
+                        <button onclick="handleApproval('approve')" class="flex-1 bg-green-600 hover:bg-green-700 py-1 rounded text-xs">批准</button>
+                        <button onclick="handleApproval('reject')" class="flex-1 bg-red-600 hover:bg-red-700 py-1 rounded text-xs">拒绝</button>
+                    </div>
+                </div>
+
+                <!-- 多智能体控制面板 -->
+                <div class="bg-gray-800 rounded-lg p-3 border border-amber-500/30">
+                    <h2 class="font-semibold mb-2 text-amber-400 text-sm">🤖 多智能体协作</h2>
+                    <div class="text-xs text-gray-500 mb-2">
+                        <p class="cursor-pointer hover:text-amber-400" onclick="setInput('全部智能体协作分析')">• 全部智能体协作分析</p>
+                    </div>
+                    <div class="text-xs text-gray-400 mb-1">链式执行 (Supervisor模式):</div>
+                    <div class="flex gap-2 mb-2">
+                        <button onclick="multiAgentInvoke()" class="flex-1 bg-amber-600 hover:bg-amber-700 py-1 rounded text-xs">🔗 链式同步</button>
+                        <button onclick="multiAgentStream()" class="flex-1 bg-amber-700 hover:bg-amber-800 py-1 rounded text-xs">🔗 链式流式</button>
+                    </div>
+                    <div class="text-xs text-green-400 mb-1">⚡ 并行执行 (Parallel模式):</div>
+                    <div class="flex gap-2">
+                        <button onclick="parallelAgentInvoke()" class="flex-1 bg-green-600 hover:bg-green-700 py-1 rounded text-xs">⚡ 并行同步</button>
+                        <button onclick="parallelAgentStream()" class="flex-1 bg-green-700 hover:bg-green-800 py-1 rounded text-xs">⚡ 并行流式</button>
+                    </div>
+                </div>
+
+                <!-- Adaptive RAG 控制面板 -->
+                <div class="bg-gray-800 rounded-lg p-3 border border-rose-500/30">
+                    <h2 class="font-semibold mb-2 text-rose-400 text-sm">📖 Adaptive RAG (自适应检索)</h2>
+                    <div class="text-xs text-gray-500 mb-2 space-y-1">
+                        <p class="cursor-pointer hover:text-rose-400" onclick="setInput('什么是AI')">• 什么是AI (简单→直接生成)</p>
+                        <p class="cursor-pointer hover:text-rose-400" onclick="setInput('LangGraph的使用方法')">• LangGraph使用方法 (标准RAG)</p>
+                        <p class="cursor-pointer hover:text-rose-400" onclick="setInput('比较分析RAG和Fine-tuning的优劣')">• 比较RAG和Fine-tuning (复杂→多步检索)</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="adaptiveRagInvoke()" class="flex-1 bg-rose-600 hover:bg-rose-700 py-1 rounded text-xs">📖 RAG同步</button>
+                        <button onclick="adaptiveRagStream()" class="flex-1 bg-rose-700 hover:bg-rose-800 py-1 rounded text-xs">📖 RAG流式</button>
                     </div>
                 </div>
             </div>
 
-            <!-- 中间工作流 -->
-            <div class="bg-gray-800 rounded-lg p-4">
-                <h2 class="font-semibold mb-3 text-purple-400">工作流图</h2>
-                <div class="flex flex-col items-center space-y-2 text-xs">
-                    <div id="n-START" class="bg-green-900 border border-green-500 px-3 py-1 rounded">START</div>
+            <!-- 中间工作流图 -->
+            <div class="bg-gray-800 rounded-lg p-3">
+                <h2 class="font-semibold mb-2 text-purple-400 text-sm">工作流图 <span id="graphStatus" class="text-xs font-normal text-gray-500">(就绪)</span></h2>
+                <div class="flex flex-col items-center space-y-1 text-xs">
+                    <div id="n-__START__" class="bg-green-900 border-2 border-green-500 px-2 py-0.5 rounded font-bold">START</div>
                     <div class="text-gray-600">↓</div>
-                    <div id="n-input" class="bg-blue-900 border border-blue-500 px-3 py-1 rounded">input_processor</div>
+                    <div id="n-input_processor" class="bg-blue-900 border border-blue-500 px-2 py-0.5 rounded">input</div>
                     <div class="text-gray-600">↓</div>
-                    <div id="n-intent" class="bg-purple-900 border border-purple-500 px-3 py-1 rounded">intent_classifier</div>
+                    <div id="n-intent_classifier" class="bg-purple-900 border border-purple-500 px-2 py-0.5 rounded">intent</div>
                     <div class="text-gray-500 text-xs">↓ 条件路由</div>
-                    <div class="grid grid-cols-3 gap-2 w-full text-center">
+                    <div class="grid grid-cols-4 gap-1 w-full text-center">
                         <div class="space-y-1">
-                            <div class="text-gray-500">safe</div>
-                            <div id="n-safe" class="bg-green-900 border border-green-500 px-2 py-1 rounded">safe_op</div>
+                            <div class="text-gray-500 text-[10px]">safe</div>
+                            <div id="n-safe_operation" class="bg-green-900 border border-green-500 px-1 py-0.5 rounded text-[10px]">safe</div>
                         </div>
                         <div class="space-y-1">
-                            <div class="text-gray-500">tool</div>
-                            <div id="n-tool" class="bg-cyan-900 border border-cyan-500 px-2 py-1 rounded">tool_exec</div>
-                            <div class="text-gray-600">↓</div>
-                            <div id="n-valid" class="bg-cyan-900 border border-cyan-500 px-2 py-1 rounded">validation</div>
-                            <div class="text-yellow-500">↩ Cycle</div>
+                            <div class="text-gray-500 text-[10px]">tool</div>
+                            <div id="n-tool_executor" class="bg-cyan-900 border border-cyan-500 px-1 py-0.5 rounded text-[10px]">tool</div>
+                            <div class="text-gray-600 text-[10px]">↓</div>
+                            <div id="n-validation" class="bg-cyan-900 border border-cyan-500 px-1 py-0.5 rounded text-[10px]">valid</div>
+                            <div class="text-yellow-500 text-[10px]">↩Cycle</div>
+                        </div>
+                        <div class="space-y-1 subgraph-box rounded p-1 bg-purple-900/20">
+                            <div class="text-purple-400 text-[10px] font-bold">🏥 健康子图 (SubGraph)</div>
+                            <div id="n-health_subgraph" class="bg-purple-900 border border-purple-500 px-1 py-0.5 rounded text-[10px] mb-1">health_subgraph</div>
+                            <!-- 子图内部结构 -->
+                            <div class="bg-gray-800/50 rounded p-1 space-y-0.5">
+                                <div id="n-sg-health_triage" class="bg-pink-900/60 border border-pink-500 px-1 py-0.5 rounded text-[9px]">triage</div>
+                                <div class="text-purple-400 text-[8px]">↓ 条件路由</div>
+                                <div class="flex gap-0.5 text-[8px]">
+                                    <div id="n-sg-symptom_analysis" class="flex-1 bg-red-900/50 border border-red-400 px-0.5 py-0.5 rounded text-center">🩺 sym</div>
+                                    <div id="n-sg-nutrition_advice" class="flex-1 bg-green-900/50 border border-green-400 px-0.5 py-0.5 rounded text-center">🥗 nut</div>
+                                    <div id="n-sg-exercise_plan" class="flex-1 bg-blue-900/50 border border-blue-400 px-0.5 py-0.5 rounded text-center">🏃 exe</div>
+                                </div>
+                                <div class="text-purple-400 text-[8px]">↓</div>
+                                <div id="n-sg-health_summary" class="bg-pink-900/60 border border-pink-500 px-1 py-0.5 rounded text-[9px]">summary</div>
+                            </div>
                         </div>
                         <div class="space-y-1">
-                            <div class="text-gray-500">danger</div>
-                            <div id="n-approval" class="bg-yellow-900 border border-yellow-500 px-2 py-1 rounded">approval</div>
-                            <div class="text-red-400">⚡HITL</div>
-                            <div id="n-handler" class="bg-yellow-900 border border-yellow-500 px-2 py-1 rounded">handler</div>
+                            <div class="text-gray-500 text-[10px]">danger</div>
+                            <div id="n-approval_request" class="bg-yellow-900 border border-yellow-500 px-1 py-0.5 rounded text-[10px]">approval</div>
+                            <div class="text-red-400 text-[10px]">⚡HITL</div>
+                            <div id="n-approval_handler" class="bg-yellow-900 border border-yellow-500 px-1 py-0.5 rounded text-[10px]">handler</div>
                         </div>
                     </div>
                     <div class="text-gray-600">↓</div>
-                    <div id="n-result" class="bg-indigo-900 border border-indigo-500 px-3 py-1 rounded">result_aggregator</div>
+                    <div id="n-result_aggregator" class="bg-indigo-900 border border-indigo-500 px-2 py-0.5 rounded">result</div>
                     <div class="text-gray-600">↓</div>
-                    <div id="n-END" class="bg-red-900 border border-red-500 px-3 py-1 rounded">END</div>
+                    <div id="n-__END__" class="bg-red-900 border border-red-500 px-2 py-0.5 rounded font-bold">END</div>
                 </div>
-                <div class="mt-4 p-3 bg-gray-900 rounded text-xs">
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>节点: <span id="dispNode" class="text-blue-400">-</span></div>
-                        <div>意图: <span id="dispIntent" class="text-purple-400">-</span></div>
-                        <div>步数: <span id="dispStep" class="text-green-400">0</span></div>
-                        <div>状态: <span id="dispStatus" class="text-yellow-400">idle</span></div>
+                <div class="mt-2 p-2 bg-gray-900/50 rounded text-xs">
+                    <div class="text-gray-500 mb-1">执行路径:</div>
+                    <div id="executionPath" class="text-green-400 font-mono flex flex-wrap gap-1">
+                        <span class="text-gray-600">等待...</span>
+                    </div>
+                </div>
+                <div class="mt-2 p-2 bg-gray-900 rounded text-xs grid grid-cols-2 gap-1">
+                    <div>节点: <span id="dispNode" class="text-blue-400">-</span></div>
+                    <div>意图: <span id="dispIntent" class="text-purple-400">-</span></div>
+                    <div>步数: <span id="dispStep" class="text-green-400">0</span></div>
+                    <div>状态: <span id="dispStatus" class="text-yellow-400">idle</span></div>
+                </div>
+
+                <!-- 链式多智能体工作流图 -->
+                <div id="multiAgentGraph" class="mt-3 p-2 bg-gray-900/50 rounded border border-amber-500/30 hidden">
+                    <div class="text-amber-400 text-xs font-bold mb-2">🔗 链式多智能体 (Supervisor模式)</div>
+                    <div class="flex flex-col items-center space-y-1 text-xs">
+                        <div id="n-ma-__START__" class="bg-green-900 border border-green-500 px-2 py-0.5 rounded font-bold">START</div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-ma-supervisor" class="bg-amber-900 border-2 border-amber-500 px-3 py-1 rounded">👔 Supervisor</div>
+                        <div class="text-amber-400 text-[10px]">↓ 链式分发</div>
+                        <div class="flex flex-col items-center space-y-1">
+                            <div id="n-ma-research_agent" class="bg-blue-900 border border-blue-400 px-2 py-0.5 rounded">🔍 Research</div>
+                            <div class="text-gray-500">↓</div>
+                            <div id="n-ma-analyst_agent" class="bg-purple-900 border border-purple-400 px-2 py-0.5 rounded">📊 Analyst</div>
+                            <div class="text-gray-500">↓</div>
+                            <div id="n-ma-writer_agent" class="bg-pink-900 border border-pink-400 px-2 py-0.5 rounded">✍️ Writer</div>
+                        </div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-ma-aggregator" class="bg-indigo-900 border border-indigo-500 px-2 py-0.5 rounded">📋 Aggregator</div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-ma-__END__" class="bg-red-900 border border-red-500 px-2 py-0.5 rounded font-bold">END</div>
+                    </div>
+                </div>
+
+                <!-- 并行多智能体工作流图 -->
+                <div id="parallelAgentGraph" class="mt-3 p-2 bg-gray-900/50 rounded border border-green-500/30 hidden">
+                    <div class="text-green-400 text-xs font-bold mb-2">⚡ 并行多智能体 (Parallel模式)</div>
+                    <div class="flex flex-col items-center space-y-1 text-xs">
+                        <div id="n-pa-__START__" class="bg-green-900 border border-green-500 px-2 py-0.5 rounded font-bold">START</div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-pa-dispatcher" class="bg-green-900 border-2 border-green-500 px-3 py-1 rounded">📤 Dispatcher</div>
+                        <div class="text-green-400 text-[10px]">↓ 并行分发</div>
+                        <div id="n-pa-parallel_executor" class="border-2 border-dashed border-green-500 rounded p-2 bg-green-900/20">
+                            <div class="text-green-300 text-[10px] mb-1 text-center">⚡ 同时执行</div>
+                            <div class="flex gap-2">
+                                <div id="n-pa-research" class="bg-blue-900 border border-blue-400 px-2 py-0.5 rounded">🔍 Research</div>
+                                <div id="n-pa-analyst" class="bg-purple-900 border border-purple-400 px-2 py-0.5 rounded">📊 Analyst</div>
+                                <div id="n-pa-writer" class="bg-pink-900 border border-pink-400 px-2 py-0.5 rounded">✍️ Writer</div>
+                            </div>
+                        </div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-pa-collector" class="bg-indigo-900 border border-indigo-500 px-2 py-0.5 rounded">📋 Collector</div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-pa-__END__" class="bg-red-900 border border-red-500 px-2 py-0.5 rounded font-bold">END</div>
+                    </div>
+                </div>
+
+                <!-- Adaptive RAG 工作流图 -->
+                <div id="adaptiveRagGraph" class="mt-3 p-2 bg-gray-900/50 rounded border border-rose-500/30 hidden">
+                    <div class="text-rose-400 text-xs font-bold mb-2">📖 Adaptive RAG 流程图</div>
+                    <div class="flex flex-col items-center space-y-1 text-xs">
+                        <div id="n-rag-__START__" class="bg-green-900 border border-green-500 px-2 py-0.5 rounded font-bold">START</div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-rag-query_analyzer" class="bg-rose-900 border-2 border-rose-500 px-3 py-1 rounded">🔎 Query Analyzer</div>
+                        <div class="text-rose-400 text-[10px]">↓ 查询路由</div>
+                        <div class="flex gap-1 text-[9px]">
+                            <div class="flex flex-col items-center">
+                                <div class="text-gray-500">simple</div>
+                                <div id="n-rag-direct_generate" class="bg-yellow-900 border border-yellow-500 px-1 py-0.5 rounded">⚡Direct</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="text-gray-500">standard</div>
+                                <div id="n-rag-standard_retrieve" class="bg-blue-900 border border-blue-500 px-1 py-0.5 rounded">📚Retrieve</div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="text-gray-500">complex</div>
+                                <div id="n-rag-multi_step_retrieve" class="bg-purple-900 border border-purple-500 px-1 py-0.5 rounded">🔄Multi</div>
+                            </div>
+                        </div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-rag-grade_documents" class="bg-cyan-900 border border-cyan-500 px-2 py-0.5 rounded">📊 Grade Docs</div>
+                        <div class="flex items-center gap-1 text-[9px]">
+                            <div class="text-green-400">relevant→</div>
+                            <div class="text-red-400">not→</div>
+                            <div id="n-rag-query_transform" class="bg-orange-900 border border-orange-500 px-1 py-0.5 rounded">✏️Transform</div>
+                            <div class="text-orange-400">↩</div>
+                        </div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-rag-generate_answer" class="bg-emerald-900 border border-emerald-500 px-2 py-0.5 rounded">💡 Generate</div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-rag-grade_answer" class="bg-pink-900 border border-pink-500 px-2 py-0.5 rounded">✅ Grade Answer</div>
+                        <div class="text-[9px] text-gray-500">(幻觉检测 | 质量评估)</div>
+                        <div class="text-gray-600">↓</div>
+                        <div id="n-rag-__END__" class="bg-red-900 border border-red-500 px-2 py-0.5 rounded font-bold">END</div>
                     </div>
                 </div>
             </div>
 
             <!-- 右侧输出 -->
-            <div class="space-y-4">
-                <div class="bg-gray-800 rounded-lg p-4">
-                    <h2 class="font-semibold mb-2 text-cyan-400">消息 (Appender Channel)</h2>
-                    <div id="msgBox" class="h-40 overflow-y-auto text-sm space-y-1">
+            <div class="space-y-3">
+                <div class="bg-gray-800 rounded-lg p-3">
+                    <h2 class="font-semibold mb-1 text-cyan-400 text-sm">消息</h2>
+                    <div id="msgBox" class="h-28 overflow-y-auto text-xs space-y-1">
                         <p class="text-gray-500">等待执行...</p>
                     </div>
                 </div>
-                <div class="bg-gray-800 rounded-lg p-4">
-                    <h2 class="font-semibold mb-2 text-amber-400">执行日志</h2>
-                    <div id="logBox" class="h-40 overflow-y-auto text-xs font-mono space-y-1">
+                <div class="bg-gray-800 rounded-lg p-3">
+                    <h2 class="font-semibold mb-1 text-amber-400 text-sm">执行日志</h2>
+                    <div id="logBox" class="h-28 overflow-y-auto text-xs font-mono space-y-1">
                         <p class="text-gray-500">等待执行...</p>
                     </div>
                 </div>
-                <div class="bg-gray-800 rounded-lg p-4">
-                    <h2 class="font-semibold mb-2 text-green-400">最终结果</h2>
-                    <pre id="resultBox" class="text-sm text-gray-400 whitespace-pre-wrap">等待完成...</pre>
+                <div class="bg-gray-800 rounded-lg p-3">
+                    <h2 class="font-semibold mb-1 text-green-400 text-sm">最终结果</h2>
+                    <pre id="resultBox" class="text-xs text-gray-400 whitespace-pre-wrap">等待完成...</pre>
                 </div>
             </div>
         </div>
@@ -125,103 +277,657 @@
 
     <script>
         const API = '/api/comprehensive';
-        let sessionId = null;
-
+        let executedNodes = [];
+        
         function setInput(t) { document.getElementById('userInput').value = t; }
-        function clearNodes() { document.querySelectorAll('[id^="n-"]').forEach(n => n.classList.remove('node-active','ring-2','ring-white')); }
-        function highlight(name) { clearNodes(); const n = document.getElementById('n-'+name); if(n) n.classList.add('node-active','ring-2','ring-white'); }
+        function getThreadId() { return document.getElementById('threadIdInput').value || 'default-thread'; }
+        
+        function clearAllNodes() {
+            document.querySelectorAll('[id^="n-"]').forEach(n => n.classList.remove('node-active','node-completed','node-waiting','ring-2','ring-white'));
+        }
+        
+        // 当前模式: 'workflow' 或 'multiagent'
+        let currentMode = 'workflow';
+        
+        // 转换节点名称为DOM ID（子图节点 subgraph:xxx -> sg-xxx）
+        function toNodeId(name) {
+            if (name.startsWith('subgraph:')) {
+                return 'n-sg-' + name.replace('subgraph:', '');
+            }
+            // 多智能体模式使用 ma- 前缀
+            if (currentMode === 'multiagent') {
+                return 'n-ma-' + name;
+            }
+            // 并行模式使用 pa- 前缀
+            if (currentMode === 'parallel') {
+                return 'n-pa-' + name;
+            }
+            // Adaptive RAG模式使用 rag- 前缀
+            if (currentMode === 'rag') {
+                return 'n-rag-' + name;
+            }
+            return 'n-' + name;
+        }
+        
+        function switchToWorkflowMode() {
+            currentMode = 'workflow';
+            document.getElementById('multiAgentGraph').classList.add('hidden');
+            document.getElementById('parallelAgentGraph').classList.add('hidden');
+            document.getElementById('adaptiveRagGraph').classList.add('hidden');
+        }
+        
+        function switchToMultiAgentMode() {
+            currentMode = 'multiagent';
+            document.getElementById('multiAgentGraph').classList.remove('hidden');
+            document.getElementById('parallelAgentGraph').classList.add('hidden');
+            document.getElementById('adaptiveRagGraph').classList.add('hidden');
+        }
+        
+        function switchToParallelMode() {
+            currentMode = 'parallel';
+            document.getElementById('multiAgentGraph').classList.add('hidden');
+            document.getElementById('parallelAgentGraph').classList.remove('hidden');
+            document.getElementById('adaptiveRagGraph').classList.add('hidden');
+        }
+        
+        function switchToRagMode() {
+            currentMode = 'rag';
+            document.getElementById('multiAgentGraph').classList.add('hidden');
+            document.getElementById('parallelAgentGraph').classList.add('hidden');
+            document.getElementById('adaptiveRagGraph').classList.remove('hidden');
+        }
+        
+        function markCompleted(name) {
+            const n = document.getElementById(toNodeId(name));
+            if (n) { n.classList.remove('node-active','node-waiting'); n.classList.add('node-completed'); }
+        }
+        
+        function highlightActive(name) {
+            executedNodes.forEach(n => markCompleted(n));
+            // 处理子图节点（同时高亮子图容器）
+            if (name.startsWith('subgraph:')) {
+                const parentNode = document.getElementById('n-health_subgraph');
+                if (parentNode) parentNode.classList.add('node-active');
+            }
+            const node = document.getElementById(toNodeId(name));
+            if (node) { node.classList.remove('node-completed','node-waiting'); node.classList.add('node-active','ring-2','ring-white'); }
+            const displayName = name.startsWith('subgraph:') ? '子图:' + name.replace('subgraph:', '') : name;
+            document.getElementById('graphStatus').textContent = '(执行: ' + displayName + ')';
+            document.getElementById('graphStatus').className = 'text-xs font-normal text-green-400';
+        }
+        
+        function markWaiting(name) {
+            const n = document.getElementById(toNodeId(name));
+            if (n) { n.classList.remove('node-active','node-completed'); n.classList.add('node-waiting','ring-2','ring-yellow-400'); }
+            document.getElementById('graphStatus').textContent = '(等待人工)';
+            document.getElementById('graphStatus').className = 'text-xs font-normal text-yellow-400';
+        }
+        
+        function addToPath(name) {
+            if (!executedNodes.includes(name)) executedNodes.push(name);
+            document.getElementById('executionPath').innerHTML = executedNodes.map((n, i) => {
+                const isSubgraph = n.startsWith('subgraph:');
+                const displayName = isSubgraph ? n.replace('subgraph:', '🏥') : n;
+                const bgClass = isSubgraph ? 'bg-purple-900/50' : 'bg-green-900/50';
+                return `<span class="px-1 py-0.5 ${bgClass} rounded">${displayName}</span>${i < executedNodes.length - 1 ? '<span class="text-gray-500">→</span>' : ''}`;
+            }).join('');
+        }
         
         function updateDisp(d) {
-            document.getElementById('dispNode').textContent = d.currentStep || d.node || '-';
+            const node = d.currentStep || d.node || '-';
+            const displayNode = node.startsWith('subgraph:') ? '🏥' + node.replace('subgraph:', '') : node;
+            document.getElementById('dispNode').textContent = displayNode;
             document.getElementById('dispIntent').textContent = d.intent || '-';
             document.getElementById('dispStep').textContent = d.stepCount || d.totalSteps || '0';
             document.getElementById('dispStatus').textContent = d.status || d.workflowStatus || 'running';
+            if (node && node !== '-') { highlightActive(node); addToPath(node); }
         }
         
-        function addMsg(t,c='blue') {
+        function addMsg(t, c='blue') {
             const box = document.getElementById('msgBox');
-            if(box.querySelector('.text-gray-500')) box.innerHTML='';
+            if (box.querySelector('.text-gray-500')) box.innerHTML = '';
             box.innerHTML += `<div class="p-1 rounded bg-${c}-900/30 border border-${c}-700 text-${c}-300">${t}</div>`;
             box.scrollTop = box.scrollHeight;
         }
         
         function addLog(t) {
             const box = document.getElementById('logBox');
-            if(box.querySelector('.text-gray-500')) box.innerHTML='';
+            if (box.querySelector('.text-gray-500')) box.innerHTML = '';
             box.innerHTML += `<div class="text-gray-400">${t}</div>`;
             box.scrollTop = box.scrollHeight;
         }
         
         function reset() {
-            clearNodes();
-            document.getElementById('msgBox').innerHTML='<p class="text-gray-500">执行中...</p>';
-            document.getElementById('logBox').innerHTML='<p class="text-gray-500">执行中...</p>';
-            document.getElementById('resultBox').textContent='执行中...';
+            clearAllNodes();
+            executedNodes = [];
+            document.getElementById('executionPath').innerHTML = '<span class="text-gray-600">开始...</span>';
+            document.getElementById('msgBox').innerHTML = '<p class="text-gray-500">执行中...</p>';
+            document.getElementById('logBox').innerHTML = '<p class="text-gray-500">执行中...</p>';
+            document.getElementById('resultBox').textContent = '执行中...';
             document.getElementById('approvalPanel').classList.add('hidden');
+            document.getElementById('graphStatus').textContent = '(执行中)';
+            highlightActive('__START__');
+            addToPath('START');
+        }
+        
+        function markComplete() {
+            executedNodes.forEach(n => markCompleted(n));
+            highlightActive('__END__');
+            addToPath('END');
+            document.getElementById('graphStatus').textContent = '(完成)';
+            document.getElementById('graphStatus').className = 'text-xs font-normal text-green-400';
         }
 
         async function executeInvoke() {
             const input = document.getElementById('userInput').value || '默认';
-            reset(); highlight('START');
+            switchToWorkflowMode();
+            reset();
+            addLog('同步执行: ' + input);
             const res = await fetch(`${API}/invoke`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userInput:input})});
             const d = await res.json();
-            if(d.success) {
-                (d.messages||[]).forEach(m => addMsg(m));
-                (d.executionLog||[]).forEach(l => addLog(l));
-                updateDisp(d);
-                document.getElementById('resultBox').textContent = d.finalResult || '完成';
-                highlight('END');
-            } else addMsg('错误: '+d.error, 'red');
+            if (d.success) {
+                (d.executionLog || []).forEach((l, i) => setTimeout(() => addLog(l), i * 200));
+                setTimeout(() => {
+                    (d.messages || []).forEach(m => addMsg(m));
+                    updateDisp(d);
+                    document.getElementById('resultBox').textContent = d.finalResult || '完成';
+                    markComplete();
+                }, (d.executionLog?.length || 0) * 200 + 100);
+            } else addMsg('错误: ' + d.error, 'red');
         }
 
         async function executeStream() {
             const input = document.getElementById('userInput').value || '默认';
-            reset(); highlight('START');
+            switchToWorkflowMode();
+            reset();
+            addLog('流式执行: ' + input);
+            
+            const ANIMATION_DELAY = 600; // 每个节点高亮的停留时间(ms)
+            let eventQueue = [];
+            let isProcessing = false;
+            let streamEnded = false;
+            
+            // 处理队列中的事件（带延迟）
+            function processQueue() {
+                if (isProcessing || eventQueue.length === 0) {
+                    if (streamEnded && eventQueue.length === 0) {
+                        setTimeout(() => {
+                            markComplete();
+                            document.getElementById('dispStatus').textContent = 'completed';
+                            addLog('✅ 流式执行完成');
+                        }, ANIMATION_DELAY);
+                    }
+                    return;
+                }
+                isProcessing = true;
+                const d = eventQueue.shift();
+                const node = d.node || d.currentStep;
+                if (node) { highlightActive(node); addToPath(node); }
+                updateDisp(d);
+                if (d.messages?.length) addMsg(d.messages[d.messages.length-1]);
+                addLog(`[${node}] step ${d.stepCount}`);
+                setTimeout(() => {
+                    isProcessing = false;
+                    processQueue();
+                }, ANIMATION_DELAY);
+            }
+            
             const es = new EventSource(`${API}/stream?userInput=${encodeURIComponent(input)}`);
             es.onmessage = e => {
-                const d = JSON.parse(e.data);
-                updateDisp(d);
-                if(d.messages?.length) addMsg(d.messages[d.messages.length-1]);
-                addLog(`[${d.node}] step ${d.stepCount}`);
+                try {
+                    const d = JSON.parse(e.data);
+                    eventQueue.push(d);
+                    processQueue();
+                } catch (err) { console.error(err); }
             };
-            es.onerror = () => { es.close(); highlight('END'); document.getElementById('dispStatus').textContent='completed'; };
+            es.onerror = () => { 
+                es.close(); 
+                streamEnded = true;
+                processQueue(); // 触发最终完成处理
+            };
         }
 
-        async function startHITL() {
+        // ThreadId执行（不带HITL中断，完整执行）
+        async function startWithThread() {
+            const input = document.getElementById('userInput').value || '查询天气';
+            const threadId = getThreadId();
+            switchToWorkflowMode();
+            reset();
+            addLog(`📦 ThreadId执行(无中断) [${threadId}]: ${input}`);
+            addMsg('模式: ThreadId执行（不中断，完整执行）', 'cyan');
+            const res = await fetch(`${API}/start-with-thread`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userInput:input, threadId})});
+            const d = await res.json();
+            if (d.success) {
+                (d.executionEvents || []).forEach((evt, i) => setTimeout(() => { if (evt.node) { highlightActive(evt.node); addToPath(evt.node); } }, i * 200));
+                (d.messages || []).forEach(m => addMsg(m));
+                (d.executionLog || []).forEach(l => addLog(l));
+                updateDisp({currentStep: d.currentNode, intent: d.intent, stepCount: d.stepCount, status: 'completed'});
+                document.getElementById('resultBox').textContent = d.message;
+                markComplete();
+                setTimeout(() => loadMemory(), 1000);
+            } else addMsg('错误: ' + d.error, 'red');
+        }
+
+        // 人在回路模式（危险操作会中断等待审批）
+        async function startWithHitl() {
             const input = document.getElementById('userInput').value || '删除数据';
-            reset(); highlight('START');
-            const res = await fetch(`${API}/start-hitl`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userInput:input})});
+            const threadId = getThreadId();
+            switchToWorkflowMode();
+            reset();
+            addLog(`🔒 HITL模式启动 [${threadId}]: ${input}`);
+            addMsg('模式: 人在回路（危险操作会中断等待审批）', 'orange');
+            const res = await fetch(`${API}/start-hitl`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userInput:input, threadId})});
             const d = await res.json();
-            if(d.success) {
-                (d.messages||[]).forEach(m => addMsg(m));
-                (d.executionLog||[]).forEach(l => addLog(l));
-                updateDisp({currentStep:d.currentNode, intent:d.intent, stepCount:d.executionEvents?.length||0, status:d.waitingForApproval?'waiting':'running'});
-                if(d.waitingForApproval) {
-                    sessionId = d.sessionId;
-                    document.getElementById('sessionDisplay').textContent = sessionId;
-                    document.getElementById('approvalMsg').textContent = d.message;
+            if (d.success) {
+                (d.executionEvents || []).forEach((evt, i) => setTimeout(() => { if (evt.node) { highlightActive(evt.node); addToPath(evt.node); } }, i * 200));
+                (d.messages || []).forEach(m => addMsg(m));
+                (d.executionLog || []).forEach(l => addLog(l));
+                updateDisp({currentStep: d.currentNode, intent: d.intent, stepCount: d.stepCount, status: d.waitingForApproval ? 'waiting' : 'completed'});
+                if (d.waitingForApproval) {
+                    document.getElementById('approvalMsg').textContent = `ThreadId: ${threadId} - ${d.message}`;
                     document.getElementById('approvalPanel').classList.remove('hidden');
-                    highlight('approval');
-                } else { document.getElementById('resultBox').textContent = d.message; highlight('END'); }
-            } else addMsg('错误: '+d.error, 'red');
+                    setTimeout(() => markWaiting('approval_request'), 500);
+                    addLog('⏸️ 等待人工审批...');
+                    addMsg(`🔒 记忆已保存，等待审批 [${threadId}]`, 'yellow');
+                } else {
+                    document.getElementById('resultBox').textContent = d.finalResult || d.message;
+                    markComplete();
+                }
+                setTimeout(() => loadMemory(), 1000);
+            } else addMsg('错误: ' + d.error, 'red');
         }
 
-        async function approve() { await handleApproval('approve'); }
-        async function reject() { await handleApproval('reject'); }
-        
+        async function loadMemory() {
+            const threadId = getThreadId();
+            const panel = document.getElementById('memoryPanel');
+            panel.innerHTML = '<p class="text-gray-400">加载中...</p>';
+            try {
+                const res = await fetch(`${API}/memory/${threadId}`);
+                const d = await res.json();
+                if (d.success) {
+                    panel.innerHTML = `
+                        <div class="space-y-1">
+                            <div class="text-purple-400 font-bold">${d.threadId}</div>
+                            <div class="text-gray-400">${d.statusDescription}</div>
+                            <div>节点: <span class="text-blue-400">${d.snapshot?.currentNode || '-'}</span></div>
+                            <div>意图: <span class="text-purple-400">${d.state?.intent || '-'}</span></div>
+                            <div>步数: <span class="text-green-400">${d.state?.stepCount || 0}</span></div>
+                            <div>审批: <span class="text-yellow-400">${d.state?.approvalStatus || '-'}</span></div>
+                            <div>健康类型: <span class="text-pink-400">${d.state?.healthCategory || '-'}</span></div>
+                        </div>`;
+                    addLog(`📚 加载记忆 [${threadId}]`);
+                } else panel.innerHTML = `<p class="text-red-400">${d.error}</p>`;
+            } catch (e) { panel.innerHTML = `<p class="text-red-400">${e.message}</p>`; }
+        }
+
+        async function continueThread() {
+            const threadId = getThreadId();
+            const memRes = await fetch(`${API}/memory/${threadId}`);
+            const memData = await memRes.json();
+            if (!memData.success) { addMsg(`ThreadId [${threadId}] 无记忆`, 'red'); return; }
+            if (memData.state?.approvalStatus !== 'waiting') { addMsg(`ThreadId [${threadId}] 不在等待状态`, 'yellow'); return; }
+            const decision = confirm(`ThreadId: ${threadId}\n\n确定=批准\n取消=拒绝`);
+            await handleApproval(decision ? 'approve' : 'reject');
+        }
+
         async function handleApproval(action) {
+            const threadId = getThreadId();
             document.getElementById('approvalPanel').classList.add('hidden');
-            addMsg(`用户: ${action==='approve'?'批准✅':'拒绝❌'}`, action==='approve'?'green':'red');
-            highlight('handler');
-            const res = await fetch(`${API}/${action}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sessionId})});
+            addMsg(`决策: ${action === 'approve' ? '✅批准' : '❌拒绝'}`, action === 'approve' ? 'green' : 'red');
+            addLog(`审批: ${action}`);
+            highlightActive('approval_handler');
+            addToPath('approval_handler');
+            const res = await fetch(`${API}/continue-with-thread`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({threadId, decision:action})});
             const d = await res.json();
-            if(d.success) {
-                (d.messages||[]).forEach(m => addMsg(m));
-                (d.executionLog||[]).forEach(l => addLog(l));
-                updateDisp({currentStep:d.approvalStatus==='approved'?'dangerous':'rejection', intent:'dangerous', stepCount:d.totalSteps, status:d.workflowStatus});
-                document.getElementById('resultBox').textContent = d.finalResult || d.message;
-                highlight('END');
-            } else addMsg('错误: '+d.error, 'red');
+            if (d.success) {
+                (d.messages || []).forEach(m => addMsg(m));
+                (d.executionLog || []).forEach(l => addLog(l));
+                setTimeout(() => {
+                    if (d.approvalStatus === 'approved') { highlightActive('dangerous_operation'); addToPath('dangerous_operation'); }
+                    else { highlightActive('rejection_handler'); addToPath('rejection_handler'); }
+                }, 300);
+                setTimeout(() => {
+                    if (d.approvalStatus === 'approved') { highlightActive('result_aggregator'); addToPath('result_aggregator'); }
+                    updateDisp({currentStep: d.approvalStatus === 'approved' ? 'result_aggregator' : 'rejection_handler', intent: 'dangerous', stepCount: d.totalSteps, status: d.workflowStatus});
+                    document.getElementById('resultBox').textContent = d.finalResult || d.message;
+                    markComplete();
+                    setTimeout(() => loadMemory(), 500);
+                }, 600);
+            } else addMsg('错误: ' + d.error, 'red');
+        }
+
+        // ========== 多智能体执行函数 ==========
+        
+        async function multiAgentInvoke() {
+            const input = document.getElementById('userInput').value || '全部智能体协作分析';
+            switchToMultiAgentMode();
+            reset();
+            addLog(`🤖 多智能体同步执行: ${input}`);
+            addMsg('模式: 多智能体协作 (Supervisor模式)', 'amber');
+            
+            const res = await fetch(`${API}/multi-agent/invoke`, {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({userInput: input})
+            });
+            const d = await res.json();
+            
+            if (d.success) {
+                // 显示执行日志（带动画）
+                const logs = d.executionLog || [];
+                logs.forEach((l, i) => {
+                    setTimeout(() => {
+                        addLog(l);
+                        // 根据日志内容高亮对应节点
+                        if (l.includes('Supervisor')) { highlightActive('supervisor'); addToPath('supervisor'); }
+                        else if (l.includes('Research')) { highlightActive('research_agent'); addToPath('research_agent'); }
+                        else if (l.includes('Analyst')) { highlightActive('analyst_agent'); addToPath('analyst_agent'); }
+                        else if (l.includes('Writer')) { highlightActive('writer_agent'); addToPath('writer_agent'); }
+                        else if (l.includes('Aggregator')) { highlightActive('aggregator'); addToPath('aggregator'); }
+                    }, i * 400);
+                });
+                
+                // 显示消息
+                setTimeout(() => {
+                    (d.messages || []).forEach(m => addMsg(m));
+                    updateDisp({currentStep: 'aggregator', intent: d.intent, stepCount: d.totalSteps, status: 'completed'});
+                    document.getElementById('resultBox').textContent = d.finalResult || '多智能体协作完成';
+                    markComplete();
+                }, logs.length * 400 + 200);
+            } else {
+                addMsg('错误: ' + d.error, 'red');
+            }
+        }
+        
+        async function multiAgentStream() {
+            const input = document.getElementById('userInput').value || '全部智能体协作分析';
+            switchToMultiAgentMode();
+            reset();
+            addLog(`🤖🌊 多智能体流式执行: ${input}`);
+            addMsg('模式: 多智能体流式协作 (Supervisor模式)', 'amber');
+            
+            const ANIMATION_DELAY = 700;
+            let eventQueue = [];
+            let isProcessing = false;
+            let streamEnded = false;
+            
+            function processQueue() {
+                if (isProcessing || eventQueue.length === 0) {
+                    if (streamEnded && eventQueue.length === 0) {
+                        setTimeout(() => {
+                            markComplete();
+                            document.getElementById('dispStatus').textContent = 'completed';
+                            addLog('✅ 多智能体协作完成');
+                        }, ANIMATION_DELAY);
+                    }
+                    return;
+                }
+                isProcessing = true;
+                const d = eventQueue.shift();
+                const node = d.node || d.currentStep;
+                if (node) { highlightActive(node); addToPath(node); }
+                updateDisp(d);
+                if (d.messages?.length) addMsg(d.messages[d.messages.length-1]);
+                addLog(`[${node}] step ${d.stepCount}`);
+                // 显示智能体输出
+                if (d.toolResults?.length) {
+                    const lastResult = d.toolResults[d.toolResults.length-1];
+                    if (lastResult) addMsg(lastResult.substring(0, 100) + '...', 'amber');
+                }
+                setTimeout(() => {
+                    isProcessing = false;
+                    processQueue();
+                }, ANIMATION_DELAY);
+            }
+            
+            const es = new EventSource(`${API}/multi-agent/stream?userInput=${encodeURIComponent(input)}`);
+            es.onmessage = e => {
+                try {
+                    const d = JSON.parse(e.data);
+                    eventQueue.push(d);
+                    processQueue();
+                } catch (err) { console.error(err); }
+            };
+            es.onerror = () => { 
+                es.close(); 
+                streamEnded = true;
+                processQueue();
+            };
+        }
+
+        // ========== 并行多智能体执行函数 ==========
+        
+        async function parallelAgentInvoke() {
+            const input = document.getElementById('userInput').value || '全部智能体协作分析';
+            switchToParallelMode();
+            reset();
+            addLog(`⚡ 并行多智能体同步执行: ${input}`);
+            addMsg('模式: ⚡ 并行多智能体协作 (所有Agent同时执行)', 'green');
+            
+            const res = await fetch(`${API}/parallel-agent/invoke`, {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({userInput: input})
+            });
+            const d = await res.json();
+            
+            if (d.success) {
+                // 显示执行日志（带动画）
+                const logs = d.executionLog || [];
+                
+                // 先高亮dispatcher
+                setTimeout(() => {
+                    highlightActive('dispatcher');
+                    addToPath('dispatcher');
+                    addLog('[dispatcher] 分发任务');
+                }, 300);
+                
+                // 同时高亮所有并行Agent
+                setTimeout(() => {
+                    highlightActive('parallel_executor');
+                    addToPath('parallel_executor');
+                    // 同时高亮三个Agent
+                    ['n-pa-research', 'n-pa-analyst', 'n-pa-writer'].forEach(id => {
+                        const node = document.getElementById(id);
+                        if (node) node.classList.add('node-active', 'ring-2', 'ring-white');
+                    });
+                    addMsg('⚡ 三个Agent并行执行中...', 'green');
+                }, 600);
+                
+                // 显示并行日志
+                logs.forEach((l, i) => {
+                    setTimeout(() => addLog(l), 900 + i * 150);
+                });
+                
+                // 高亮collector并完成
+                setTimeout(() => {
+                    ['n-pa-research', 'n-pa-analyst', 'n-pa-writer'].forEach(id => {
+                        const node = document.getElementById(id);
+                        if (node) { node.classList.remove('node-active'); node.classList.add('node-completed'); }
+                    });
+                    highlightActive('collector');
+                    addToPath('collector');
+                    (d.messages || []).forEach(m => addMsg(m));
+                    updateDisp({currentStep: 'collector', intent: d.intent, stepCount: d.totalSteps, status: 'completed'});
+                    document.getElementById('resultBox').textContent = d.finalResult || '并行协作完成';
+                    markComplete();
+                }, logs.length * 150 + 1200);
+            } else {
+                addMsg('错误: ' + d.error, 'red');
+            }
+        }
+        
+        async function parallelAgentStream() {
+            const input = document.getElementById('userInput').value || '全部智能体协作分析';
+            switchToParallelMode();
+            reset();
+            addLog(`⚡🌊 并行多智能体流式执行: ${input}`);
+            addMsg('模式: ⚡ 并行多智能体流式协作', 'green');
+            
+            const ANIMATION_DELAY = 800;
+            let eventQueue = [];
+            let isProcessing = false;
+            let streamEnded = false;
+            
+            function processQueue() {
+                if (isProcessing || eventQueue.length === 0) {
+                    if (streamEnded && eventQueue.length === 0) {
+                        setTimeout(() => {
+                            markComplete();
+                            document.getElementById('dispStatus').textContent = 'completed';
+                            addLog('✅ 并行协作完成');
+                        }, ANIMATION_DELAY);
+                    }
+                    return;
+                }
+                isProcessing = true;
+                const d = eventQueue.shift();
+                const node = d.node || d.currentStep;
+                
+                if (node) { 
+                    highlightActive(node); 
+                    addToPath(node); 
+                    
+                    // 如果是parallel_executor，同时高亮所有Agent
+                    if (node === 'parallel_executor') {
+                        ['n-pa-research', 'n-pa-analyst', 'n-pa-writer'].forEach(id => {
+                            const n = document.getElementById(id);
+                            if (n) n.classList.add('node-active', 'ring-2', 'ring-white');
+                        });
+                        addMsg('⚡ 三个Agent并行执行中...', 'green');
+                    }
+                }
+                updateDisp(d);
+                if (d.messages?.length) addMsg(d.messages[d.messages.length-1]);
+                
+                // 显示所有日志
+                (d.executionLog || []).forEach(l => addLog(l));
+                
+                setTimeout(() => {
+                    // 完成parallel_executor后标记所有Agent为完成
+                    if (node === 'parallel_executor') {
+                        ['n-pa-research', 'n-pa-analyst', 'n-pa-writer'].forEach(id => {
+                            const n = document.getElementById(id);
+                            if (n) { n.classList.remove('node-active'); n.classList.add('node-completed'); }
+                        });
+                    }
+                    isProcessing = false;
+                    processQueue();
+                }, ANIMATION_DELAY);
+            }
+            
+            const es = new EventSource(`${API}/parallel-agent/stream?userInput=${encodeURIComponent(input)}`);
+            es.onmessage = e => {
+                try {
+                    const d = JSON.parse(e.data);
+                    eventQueue.push(d);
+                    processQueue();
+                } catch (err) { console.error(err); }
+            };
+            es.onerror = () => { 
+                es.close(); 
+                streamEnded = true;
+                processQueue();
+            };
+        }
+
+        // ========== Adaptive RAG 执行函数 ==========
+        
+        async function adaptiveRagInvoke() {
+            const input = document.getElementById('userInput').value || 'LangGraph的使用方法';
+            switchToRagMode();
+            reset();
+            addLog(`📖 Adaptive RAG 同步执行: ${input}`);
+            addMsg('模式: 📖 Adaptive RAG (自适应检索增强生成)', 'rose');
+            
+            const res = await fetch(`${API}/adaptive-rag/invoke`, {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({userInput: input})
+            });
+            const d = await res.json();
+            
+            if (d.success) {
+                const logs = d.executionLog || [];
+                logs.forEach((l, i) => {
+                    setTimeout(() => {
+                        addLog(l);
+                        // 根据日志内容高亮对应节点
+                        if (l.includes('Query Analyzer')) { highlightActive('query_analyzer'); addToPath('query_analyzer'); }
+                        else if (l.includes('Direct Generate')) { highlightActive('direct_generate'); addToPath('direct_generate'); }
+                        else if (l.includes('Standard Retrieve')) { highlightActive('standard_retrieve'); addToPath('standard_retrieve'); }
+                        else if (l.includes('Multi-Step')) { highlightActive('multi_step_retrieve'); addToPath('multi_step_retrieve'); }
+                        else if (l.includes('Grade Documents')) { highlightActive('grade_documents'); addToPath('grade_documents'); }
+                        else if (l.includes('Query Transform')) { highlightActive('query_transform'); addToPath('query_transform'); }
+                        else if (l.includes('Generate Answer')) { highlightActive('generate_answer'); addToPath('generate_answer'); }
+                        else if (l.includes('Grade Answer')) { highlightActive('grade_answer'); addToPath('grade_answer'); }
+                    }, i * 400);
+                });
+                
+                setTimeout(() => {
+                    (d.messages || []).forEach(m => addMsg(m));
+                    updateDisp({currentStep: 'grade_answer', intent: d.intent, stepCount: d.totalSteps, status: 'completed'});
+                    document.getElementById('resultBox').textContent = d.finalResult || 'Adaptive RAG完成';
+                    markComplete();
+                }, logs.length * 400 + 200);
+            } else {
+                addMsg('错误: ' + d.error, 'red');
+            }
+        }
+        
+        async function adaptiveRagStream() {
+            const input = document.getElementById('userInput').value || 'LangGraph的使用方法';
+            switchToRagMode();
+            reset();
+            addLog(`📖🌊 Adaptive RAG 流式执行: ${input}`);
+            addMsg('模式: 📖 Adaptive RAG 流式 (自适应检索)', 'rose');
+            
+            const ANIMATION_DELAY = 700;
+            let eventQueue = [];
+            let isProcessing = false;
+            let streamEnded = false;
+            
+            function processQueue() {
+                if (isProcessing || eventQueue.length === 0) {
+                    if (streamEnded && eventQueue.length === 0) {
+                        setTimeout(() => {
+                            markComplete();
+                            document.getElementById('dispStatus').textContent = 'completed';
+                            addLog('✅ Adaptive RAG 完成');
+                        }, ANIMATION_DELAY);
+                    }
+                    return;
+                }
+                isProcessing = true;
+                const d = eventQueue.shift();
+                const node = d.node || d.currentStep;
+                if (node) { highlightActive(node); addToPath(node); }
+                updateDisp(d);
+                if (d.messages?.length) addMsg(d.messages[d.messages.length-1]);
+                addLog(`[${node}] step ${d.stepCount}`);
+                if (d.toolResults?.length) {
+                    const lastResult = d.toolResults[d.toolResults.length-1];
+                    if (lastResult) addMsg(lastResult.substring(0, 80) + '...', 'rose');
+                }
+                setTimeout(() => {
+                    isProcessing = false;
+                    processQueue();
+                }, ANIMATION_DELAY);
+            }
+            
+            const es = new EventSource(`${API}/adaptive-rag/stream?userInput=${encodeURIComponent(input)}`);
+            es.onmessage = e => {
+                try {
+                    const d = JSON.parse(e.data);
+                    eventQueue.push(d);
+                    processQueue();
+                } catch (err) { console.error(err); }
+            };
+            es.onerror = () => { 
+                es.close(); 
+                streamEnded = true;
+                processQueue();
+            };
         }
     </script>
 </body>
