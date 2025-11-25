@@ -8,6 +8,7 @@ import org.bsc.langgraph4j.studio.springboot.LangGraphStudioConfig;
 import org.example.langgraph4jlearn.agent.graph.SimpleAgent;
 import org.example.langgraph4jlearn.agent.graph.MedicalAgent;
 import org.example.langgraph4jlearn.agent.graph.MedicalAssistantGraph;
+import org.example.langgraph4jlearn.agent.graph.ComprehensiveWorkflowGraph;
 import org.example.langgraph4jlearn.demo.HumanInLoopDemo;
 import org.springframework.context.annotation.Configuration;
 
@@ -95,13 +96,29 @@ public class LangGraphStudioConfiguration extends LangGraphStudioConfig {
                     .build();
             log.info("Medical Assistant HITL 已注册到 LangGraph Studio");
             
+            // 创建 Comprehensive Workflow - 综合示例
+            ComprehensiveWorkflowGraph comprehensiveWorkflow = new ComprehensiveWorkflowGraph();
+            MemorySaver saver6 = new MemorySaver();
+            LangGraphStudioServer.Instance comprehensiveInstance = 
+                LangGraphStudioServer.Instance.builder()
+                    .title("Comprehensive Workflow - 综合示例")
+                    .addInputStringArg("user_input")
+                    .graph(comprehensiveWorkflow.getGraph())
+                    .compileConfig(CompileConfig.builder()
+                        .checkpointSaver(saver6)
+                        .interruptAfter("approval_request")  // 在审批请求后中断
+                        .build())
+                    .build();
+            log.info("Comprehensive Workflow 已注册到 LangGraph Studio");
+            
             // 返回实例映射
             return Map.of(
                 "simple-agent", simpleAgentInstance,
                 "medical-agent", medicalAgentInstance,
                 "medical-assistant-stage2", medicalAssistantInstance,
                 "human-in-loop", humanInLoopInstance,
-                "medical-assistant-hitl", medicalAssistantHITLInstance
+                "medical-assistant-hitl", medicalAssistantHITLInstance,
+                "comprehensive-workflow", comprehensiveInstance
             );
             
         } catch (Exception e) {
