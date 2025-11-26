@@ -1,0 +1,43 @@
+{
+  "tenantId": "tenant_B",
+  "graphName": "文本处理流程",
+  "nodes": [
+    {
+      "id": "append",
+      "type": "appendNode",
+      "params": {
+        "suffix": "-json-test"
+      }
+    },
+    {
+      "id": "upperCase",
+      "type": "upperCaseNode",
+      "params": {}
+    },
+    {
+      "id": "logger",
+      "type": "logNode",
+      "params": {
+        "prefix": "[租户B-JSON]"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "START",
+      "to": "append"
+    },
+    {
+      "from": "append",
+      "to": "upperCase"
+    },
+    {
+      "from": "upperCase",
+      "to": "logger"
+    },
+    {
+      "from": "logger",
+      "to": "END"
+    }
+  ]
+}

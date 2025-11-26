@@ -1,0 +1,32 @@
+{
+  "tenantId": "tenant_A",
+  "graphName": "简单处理流程",
+  "nodes": [
+    {
+      "id": "upperCase",
+      "type": "upperCaseNode",
+      "params": {}
+    },
+    {
+      "id": "logger",
+      "type": "logNode",
+      "params": {
+        "prefix": "[租户A-JSON]"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "START",
+      "to": "upperCase"
+    },
+    {
+      "from": "upperCase",
+      "to": "logger"
+    },
+    {
+      "from": "logger",
+      "to": "END"
+    }
+  ]
+}
